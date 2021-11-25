@@ -14,6 +14,8 @@ from copy import copy
 
 import pathlib
 
+from pymongo.command_cursor import CommandCursor
+
 from topic_store import get_package_root
 from topic_store.api import Storage
 from topic_store.data import TopicStore
@@ -193,6 +195,16 @@ class MongoStorage(Storage):
                                 apply_fn=None if (skip_fetch_binary or not self._use_grid_fs) else self.__ungridfs_ify,
                                 skip_on_error=skip_on_error)
 
+    def aggregate(self, *args, **kwargs):
+        """Returns TopicStoreCursor to all documents in the query"""
+        skip_fetch_binary, skip_on_error, args, kwargs = self.__parse_find_args_kwargs(args, kwargs)
+
+        find_cursor = self.collection.aggregate(*args, **kwargs)
+
+        return TopicStoreCursor(find_cursor,
+                                apply_fn=None if (skip_fetch_binary or not self._use_grid_fs) else self.__ungridfs_ify,
+                                skip_on_error=skip_on_error)
+
     __iter__ = find
 
     def find_one(self, query, *args, **kwargs):
@@ -228,7 +240,7 @@ class MongoStorage(Storage):
             session_id = bson.ObjectId(session_id)
         return self.find({"_ts_meta.session": session_id}, *args, **kwargs)
 
-    def get_unique_sessions(self):
+    def get_unique_sessions_legacy(self):
         """Returns IDs of unique data collections scenario runs in the collection"""
         return dict((x["_id"], {"time": x["sys_time"], "count": x["count"], "date": x["date_collected"]}) for x in
                     self.collection.aggregate(
@@ -243,7 +255,7 @@ class MongoStorage(Storage):
                                                        'second': {'$second': '$_ts_meta.session'},
                                                        'millisecond': {'$millisecond': '$_ts_meta.session'}}}}}}]))
 
-    def get_unique_sessions_fast(self, count=True):
+    def get_unique_sessions(self, count=True):
         """Returns IDs of unique data collections scenario runs in the collection quickly"""
         return {s: {
             "time": time.mktime(s.generation_time.timetuple()),
@@ -299,6 +311,8 @@ class TopicStoreCursor:
             return document
 
     def __getitem__(self, item):
+        if isinstance(self.cursor, CommandCursor):
+            return self.__get(self.cursor.next())
         return self.__get(self.cursor.__getitem__(item))
 
     def next(self):
