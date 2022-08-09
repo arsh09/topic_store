@@ -197,7 +197,7 @@ def _convert_cli():
 
         # Some simple rules to support searching by ID from console
         for k, v in query.items():
-            if isinstance(v, (str, unicode)) and (v.startswith('ObjectId(') and v.endswith(')')):
+            if isinstance(v, (str, str)) and (v.startswith('ObjectId(') and v.endswith(')')):
                 print("Converting query field '{}' to ObjectId".format(k))
                 query[k] = ObjectId(str(v[9:-1]))
 
