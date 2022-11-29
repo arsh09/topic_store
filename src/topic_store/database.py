@@ -50,7 +50,7 @@ class MongoStorage(Storage):
             uri: URI overload, if passed will attempt to connect directly and config not used
         """
         if db_name is None:
-            db_name = "topic_store"
+            db_name = "topic_store_030"
         self.verbose = verbose
         self.uri = uri
         if self.uri is None:

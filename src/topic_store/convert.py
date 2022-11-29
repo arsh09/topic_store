@@ -53,8 +53,8 @@ def get_mongo_storage_by_session(client, *args, **kwargs):
              enumerate(s_lut)])))
         while True:
             try:
-                char = raw_input("Please enter a number or enter for all: ")
-                if char is "":
+                char = input("Please enter a number or enter for all: ")
+                if char == "":
                     return client.find(*args, **kwargs)
                 return client.find_by_session_id(s_lut[int(char)]["id"], *args, **kwargs)
             except (EOFError, ValueError, IndexError):
@@ -87,9 +87,14 @@ def mongodb_to_ros_bag(mongodb_client, output_file, query=None, projection=None)
     if query is None or not isinstance(query, dict):
         storage = get_mongo_storage_by_session(mongodb_client, skip_on_error=True, projection=projection)
     else:
-        storage = mongodb_client.find(query, skip_on_error=True, projection=projection)
+        storage = mongodb_client.find((query), skip_on_error=True, projection=projection)
+    
+    if pymongo.__version__ == '4.0.2':
+        count = mongodb_client.collection.count_documents( query ) 
+    else:
+        count = storage.count()
 
-    count = storage.cursor.count()
+    print ("Document counts: {}".format(count) ) 
 
     ros_bag = rosbag.Bag(str(output_file), 'w')
 
@@ -197,7 +202,7 @@ def _convert_cli():
 
         # Some simple rules to support searching by ID from console
         for k, v in query.items():
-            if isinstance(v, (str, unicode)) and (v.startswith('ObjectId(') and v.endswith(')')):
+            if isinstance(v, (str, str)) and (v.startswith('ObjectId(') and v.endswith(')')):
                 print("Converting query field '{}' to ObjectId".format(k))
                 query[k] = ObjectId(str(v[9:-1]))
 
@@ -206,6 +211,7 @@ def _convert_cli():
         if "authSource" in srv:
             options = [s.split('=') for s in urlparse(srv).query.split("&") if s]
             options = {k: v for k, v in options}
+            print ( options )
             if "authSource" in options:
                 db_name = options["authSource"]
         client = MongoStorage(collection=collection, uri=srv, db_name=db_name)
